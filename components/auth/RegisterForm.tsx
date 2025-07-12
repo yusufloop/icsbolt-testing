@@ -64,8 +64,8 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
     if (!validateForm()) return;
     
     const result = await register({
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
+      first_name: formData.firstName.trim(),
+      last_name: formData.lastName.trim(),
       email: formData.email.trim(),
       password: formData.password,
       confirmPassword: formData.confirmPassword,

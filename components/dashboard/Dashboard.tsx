@@ -1,157 +1,229 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  Platform,
+  Dimensions 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/hooks/useAuth';
+import { MaterialIcons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-export function Dashboard() {
-  const { user, logout, isLoading } = useAuth();
+interface Invoice {
+  id: string;
+  description: string;
+  status: 'Paid' | 'Overdue';
+  statusType: 'success' | 'error';
+}
 
-  const handleLogout = async () => {
-    await logout();
+interface BookingStats {
+  total: number;
+  inTransit: number;
+  new: number;
+  delivered: number;
+}
+
+export default function Dashboard() {
+  const [selectedTab, setSelectedTab] = useState('Dashboard');
+  
+  const invoices: Invoice[] = [
+    { id: '#ITEM 2', description: 'PNG - KLG', status: 'Paid', statusType: 'success' },
+    { id: '#ITEM 2', description: 'PNG - KLG', status: 'Paid', statusType: 'success' },
+    { id: '#ITEM 2', description: 'PNG - KLG', status: 'Overdue', statusType: 'error' },
+  ];
+
+  const bookingStats: BookingStats = {
+    total: 159,
+    inTransit: 64,
+    new: 10,
+    delivered: 85,
   };
 
-  const stats = [
-    { label: 'Projects', value: '12', icon: 'briefcase', color: '#3b82f6' },
-    { label: 'Tasks', value: '48', icon: 'checkmark-circle', color: '#10b981' },
-    { label: 'Notifications', value: '3', icon: 'notifications', color: '#f59e0b' },
+  const quickBookings = [
+    { id: '#ITEM 2', status: 'Picked Up' },
+    { id: '#ITEM 2', status: 'Picked Up' },
+    { id: '#ITEM 2', status: 'Picked Up' },
   ];
 
-  const quickActions = [
-    { label: 'Profile Settings', icon: 'person', color: '#6366f1' },
-    { label: 'App Settings', icon: 'settings', color: '#8b5cf6' },
-    { label: 'Notifications', icon: 'notifications', color: '#06b6d4' },
+  const tabBarItems = [
+    { name: 'Dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { name: 'Bookings', icon: 'event-note', label: 'Bookings' },
+    { name: 'User', icon: 'person', label: 'User' },
+    { name: 'More', icon: 'more-horiz', label: 'More' },
   ];
+
+  const StatusBadge = ({ status, type }: { status: string; type: 'success' | 'error' | 'warning' }) => {
+    const getBadgeStyle = (type: string) => {
+      switch (type) {
+        case 'success':
+          return 'bg-success';
+        case 'error':
+          return 'bg-destructive';
+        case 'warning':
+          return 'bg-warning';
+        default:
+          return 'bg-gray-500';
+      }
+    };
+
+    return (
+      <View className={`px-3 py-1 rounded-lg ${getBadgeStyle(type)}`}>
+        <Text className="text-xs font-medium text-white">
+          {status}
+        </Text>
+      </View>
+    );
+  };
+
+  const CircularProgress = ({ stats }: { stats: BookingStats }) => {
+    const { width } = Dimensions.get('window');
+    const size = Math.min(width * 0.4, 160);
+    
+    return (
+      <View className="items-center justify-center" style={{ width: size, height: size }}>
+        <View className="absolute items-center justify-center" style={{ width: size, height: size }}>
+          {/* Background circle */}
+          <View 
+            className="rounded-full border-8 border-gray-200"
+            style={{ width: size, height: size }}
+          />
+          
+          {/* Progress arcs - simplified visual representation */}
+          <View className="absolute items-center justify-center">
+            <Text className="text-4xl font-bold text-text-primary">
+              {stats.total}
+            </Text>
+            <Text className="text-sm text-text-secondary mt-1">
+              Bookings this year
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-bg-primary">
       <ScrollView 
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: Platform.OS === 'ios' ? 100 : 80
-        }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* Header */}
-        <View className="flex-row items-center justify-between px-6 py-4 bg-white shadow-sm">
-          <View className="flex-1">
-            <Text className="text-gray-500 text-sm font-inter-regular">
-              Welcome back,
-            </Text>
-            <Text className="text-gray-900 text-xl font-inter-bold mt-1">
-              {user?.first_name} {user?.last_name}
-            </Text>
-          </View>
-          
-          <TouchableOpacity 
-            className="p-2 rounded-lg bg-gray-100 active:bg-gray-200"
-            onPress={handleLogout}
-            disabled={isLoading}
-          >
-            <Ionicons name="log-out" size={20} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-
-        {/* User Info Card */}
-        <View className="mx-6 mt-4 p-4 bg-white rounded-xl shadow-sm border border-gray-200">
+        <View className="flex-row items-center justify-between px-4 py-4 bg-bg-secondary shadow-md">
           <View className="flex-row items-center">
-            {/* Avatar */}
-            <View className="w-16 h-16 bg-blue-500 rounded-full items-center justify-center">
-              <Text className="text-white text-xl font-inter-bold">
-                {user?.first_name?.[0]}{user?.last_name?.[0]}
-              </Text>
-            </View>
-            
-            {/* User Details */}
-            <View className="flex-1 ml-4">
-              <Text className="text-gray-900 text-lg font-inter-semibold">
-                {user?.first_name} {user?.last_name}
-              </Text>
-              <Text className="text-gray-500 text-sm font-inter-regular mt-1">
-                {user?.email}
-              </Text>
-              <View className="flex-row items-center mt-2">
-                <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-                <Text className="text-green-600 text-xs font-inter-regular">
-                  {user?.email_verified ? 'Verified' : 'Unverified'}
-                </Text>
-              </View>
-            </View>
+            <MaterialIcons name="star" size={24} color="#0A84FF" />
+            <Text className="text-xl font-bold text-text-primary ml-3">
+              Dashboard
+            </Text>
           </View>
+          <Text className="text-sm text-text-secondary">
+            9:09
+          </Text>
         </View>
 
-        {/* Stats Grid */}
-        <View className="mx-6 mt-6">
-          <Text className="text-gray-900 text-lg font-inter-semibold mb-4">
-            Overview
+        {/* Invoices Section */}
+        <Animated.View 
+          entering={FadeInDown.delay(100)}
+          className="mx-4 mt-6"
+        >
+          <Text className="text-lg font-bold text-primary mb-4">
+            Invoices
           </Text>
           
-          <View className="flex-row flex-wrap -mx-2">
-            {stats.map((stat, index) => (
-              <View key={index} className="w-1/3 px-2 mb-4">
-                <View className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                  <View 
-                    className="w-10 h-10 rounded-lg items-center justify-center mb-3"
-                    style={{ backgroundColor: stat.color + '20' }}
-                  >
-                    <Ionicons 
-                      name={stat.icon as any} 
-                      size={20} 
-                      color={stat.color} 
-                    />
-                  </View>
-                  
-                  <Text className="text-2xl font-inter-bold text-gray-900">
-                    {stat.value}
+          <View className="bg-bg-secondary rounded-xl shadow-md border border-gray-100">
+            {invoices.map((invoice, index) => (
+              <View 
+                key={index}
+                className={`flex-row items-center justify-between px-4 py-4 ${
+                  index !== invoices.length - 1 ? 'border-b border-gray-100' : ''
+                }`}
+              >
+                <View className="flex-1">
+                  <Text className="text-text-primary font-semibold">
+                    {invoice.id}
                   </Text>
-                  <Text className="text-gray-500 text-xs font-inter-regular mt-1">
-                    {stat.label}
+                  <Text className="text-text-secondary text-sm mt-1">
+                    {invoice.description}
                   </Text>
                 </View>
+                
+                <StatusBadge 
+                  status={invoice.status} 
+                  type={invoice.statusType} 
+                />
               </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Quick Actions */}
-        <View className="mx-6 mt-6">
-          <Text className="text-gray-900 text-lg font-inter-semibold mb-4">
-            Quick Actions
+        {/* Booking Summary Section */}
+        <Animated.View 
+          entering={FadeInDown.delay(200)}
+          className="mx-4 mt-8"
+        >
+          <Text className="text-lg font-bold text-text-primary mb-4">
+            Booking Summary
           </Text>
           
-          <View className="space-y-3">
-            {quickActions.map((action, index) => (
+          <View className="bg-bg-secondary rounded-xl shadow-md border border-gray-100 p-6">
+            <View className="items-center">
+              <CircularProgress stats={bookingStats} />
+              
+              {/* Stats Legend */}
+              <View className="flex-row flex-wrap justify-center mt-6 gap-4">
+                <View className="flex-row items-center">
+                  <View className="w-3 h-3 bg-primary rounded-full mr-2" />
+                  <Text className="text-sm text-text-secondary">
+                    In Transit <Text className="font-semibold text-text-primary">{bookingStats.inTransit}</Text>
+                  </Text>
+                </View>
+                
+                <View className="flex-row items-center">
+                  <View className="w-3 h-3 bg-warning rounded-full mr-2" />
+                  <Text className="text-sm text-text-secondary">
+                    New <Text className="font-semibold text-text-primary">{bookingStats.new}</Text>
+                  </Text>
+                </View>
+                
+                <View className="flex-row items-center">
+                  <View className="w-3 h-3 bg-info rounded-full mr-2" />
+                  <Text className="text-sm text-text-secondary">
+                    Delivered <Text className="font-semibold text-text-primary">{bookingStats.delivered}</Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Quick Bookings Section */}
+        <Animated.View 
+          entering={FadeInDown.delay(300)}
+          className="mx-4 mt-8"
+        >
+          <View className="flex-row gap-4">
+            {quickBookings.map((booking, index) => (
               <TouchableOpacity
                 key={index}
-                className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 active:bg-gray-50"
+                className="flex-1 bg-bg-secondary rounded-xl shadow-md border border-gray-100 p-4 active:bg-gray-50"
+                activeOpacity={0.7}
               >
-                <View className="flex-row items-center">
-                  <View 
-                    className="w-10 h-10 rounded-lg items-center justify-center mr-4"
-                    style={{ backgroundColor: action.color + '20' }}
-                  >
-                    <Ionicons 
-                      name={action.icon as any} 
-                      size={20} 
-                      color={action.color} 
-                    />
-                  </View>
-                  
-                  <Text className="flex-1 text-gray-900 font-inter-semibold">
-                    {action.label}
-                  </Text>
-                  
-                  <Ionicons 
-                    name="chevron-forward" 
-                    size={16} 
-                    color="#9ca3af" 
-                  />
-                </View>
+                <Text className="text-text-primary font-semibold text-center">
+                  {booking.id}
+                </Text>
+                <Text className="text-warning text-xs text-center mt-2">
+                  {booking.status}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
+
+    
     </SafeAreaView>
   );
 }
