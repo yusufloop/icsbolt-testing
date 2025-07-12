@@ -1,0 +1,45 @@
+Tech Stack: Must use Expo and Tailwind CSS.
+Generate a global design system.
+Philosophy: "Effortless Premium" (Apple HIG-inspired: clean, intuitive, high-quality).
+1. Colors:
+Primary Action: #0A84FF
+Destructive: #FF453A
+Backgrounds:
+bg-primary: #F2F2F7 (main app bg)
+bg-secondary: #FFFFFF (cards/containers)
+Text:
+text-primary: #1C1C1E (headings/body)
+text-secondary: #8A8A8E (subheadings/placeholders)
+text-tertiary: #AEAEB2 (disabled/metadata)
+Status:
+success: #30D158
+warning: #FF9F0A
+info: #FFD60A
+2. Layout & Spacing:
+Grid: 4px base unit for all spacing (p-4=16px).
+Screen Padding: Consistent horizontal padding (e.g., px-4).
+Hierarchy: Prioritize generous whitespace.
+3. Typography:
+Font: Native system stack (SF/Roboto).
+Scale:
+H1: text-2xl font-bold
+H2: text-lg font-semibold
+Body: text-base
+Caption: text-sm
+Line Height: leading-relaxed for body text.
+4. Components:
+Buttons/Inputs: rounded-lg. Required states: default, pressed (opacity/scale change), disabled (opacity-50).
+Cards: rounded-lg, shadow-md, p-4 internal padding.
+Icons: Use Heroicons library. Style: solid (active), outline (inactive). Size: consistent (e.g., 24px).
+5. Motion & Animation:
+Principle: Subtle and purposeful.
+Transitions: Gentle slide for navigation; vertical slide/fade for modals.
+Micro-interactions: Instant feedback on press (e.g., active:opacity-80).
+Lists: Staggered fade-in animation for new items.
+6. Gradients & Effects:
+Usage: Sparingly for hero elements, primary CTAs, or special backgrounds. Not for standard text/components.
+Style: Subtle, 2-stop linear gradients.
+Definitions:
+primary-gradient: Diagonal (bg-gradient-to-br), from lighter-blue (#409CFF) to primary-blue (#0A84FF).
+background-gradient: Vertical (bg-gradient-to-b), from white to bg-primary (#F2F2F7).
+Glassmorphism: For overlays, use semi-transparent backgrounds with backdrop-blur-lg.
