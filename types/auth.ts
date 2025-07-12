@@ -1,25 +1,24 @@
-export interface User {
-  user_id: string;
-  email: string;
-  name?: string;
-  first_name: string;
-  last_name: string;
-  email_verified: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  last_login_at?: string;
-  failed_login_attempts: number;
-  locked_until?: string;
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+
+// Extend Supabase User type with our custom fields
+export interface User extends SupabaseUser {
+  // Supabase auth.users already includes:
+  // - id: string
+  // - email: string
+  // - email_confirmed_at: string | null
+  // - created_at: string
+  // - updated_at: string
+  // - user_metadata: any
+  // - app_metadata: any
 }
 
 export interface AuthState {
   user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  session: any;
+  session: Session | null;
+  loading: boolean;
 }
 
+// Keep these for backward compatibility if needed
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -34,21 +33,6 @@ export interface RegisterCredentials {
   last_name: string;
 }
 
-export interface EmailVerificationData {
-  email: string;
-  verification_code: string;
-}
-
-export interface ForgotPasswordData {
-  email: string;
-}
-
-export interface PasswordResetData {
-  reset_token: string;
-  new_password: string;
-  confirm_password: string;
-}
-
 export interface AuthResponse {
   success: boolean;
   message?: string;
@@ -56,38 +40,13 @@ export interface AuthResponse {
   data?: any;
 }
 
-export interface EmailVerification {
-  id: string;
-  user_id: string;
-  email: string;
-  verification_code: string;
-  verification_token: string;
-  expires_at: string;
-  verified_at?: string;
-  attempts: number;
+// Optional: Profile table for additional user data
+export interface Profile {
+  id: string; // References auth.users(id)
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  website?: string;
   created_at: string;
-}
-
-export interface PasswordReset {
-  id: string;
-  user_id: string;
-  email: string;
-  reset_token: string;
-  reset_code: string;
-  expires_at: string;
-  used_at?: string;
-  attempts: number;
-  ip_address?: string;
-  created_at: string;
-}
-
-export interface Role {
-  role_id: number;
-  role_name: string;
-}
-
-export interface UserRole {
-  user_id: string;
-  role_id: number;
-  role?: Role;
+  updated_at: string;
 }

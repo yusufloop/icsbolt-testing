@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthCard } from './AuthCard';
@@ -9,29 +9,27 @@ import { SuccessMessage } from './SuccessMessage';
 import { useAuth } from '@/hooks/useAuth';
 
 interface PasswordResetFormProps {
-  resetToken: string;
   onNavigateToLogin: () => void;
 }
 
-export function PasswordResetForm({ resetToken, onNavigateToLogin }: PasswordResetFormProps) {
+export function PasswordResetForm({ onNavigateToLogin }: PasswordResetFormProps) {
   const [formData, setFormData] = useState({
     newPassword: '',
     confirmPassword: '',
   });
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   
-  const { resetPassword, isLoading, error } = useAuth();
+  const { updatePassword, loading } = useAuth();
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
     
     if (!formData.newPassword.trim()) {
       errors.newPassword = 'New password is required';
-    } else if (formData.newPassword.length < 8) {
-      errors.newPassword = 'Password must be at least 8 characters';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.newPassword)) {
-      errors.newPassword = 'Password must contain uppercase, lowercase, and number';
+    } else if (formData.newPassword.length < 6) {
+      errors.newPassword = 'Password must be at least 6 characters';
     }
     
     if (!formData.confirmPassword.trim()) {
@@ -47,14 +45,15 @@ export function PasswordResetForm({ resetToken, onNavigateToLogin }: PasswordRes
   const handleResetPassword = async () => {
     if (!validateForm()) return;
     
-    const result = await resetPassword({
-      reset_token: resetToken,
-      new_password: formData.newPassword,
-      confirm_password: formData.confirmPassword,
-    });
+    setError(null);
+    setSuccessMessage('');
+    
+    const { error: updateError } = await updatePassword(formData.newPassword);
 
-    if (result.success) {
-      setSuccessMessage(result.message || '');
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setSuccessMessage('Password updated successfully!');
       setTimeout(() => {
         onNavigateToLogin();
       }, 2000);
@@ -65,6 +64,9 @@ export function PasswordResetForm({ resetToken, onNavigateToLogin }: PasswordRes
     setFormData(prev => ({ ...prev, [field]: value }));
     if (fieldErrors[field]) {
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (error) {
+      setError(null);
     }
   };
 
@@ -114,9 +116,9 @@ export function PasswordResetForm({ resetToken, onNavigateToLogin }: PasswordRes
       />
 
       <AuthButton
-        title="Reset Password"
+        title="Update Password"
         onPress={handleResetPassword}
-        loading={isLoading}
+        loading={loading}
         style={{ marginBottom: 24 }}
       />
     </AuthCard>

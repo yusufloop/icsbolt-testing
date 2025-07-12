@@ -54,12 +54,3 @@ export const handleSupabaseError = (error: any): string => {
   }
   return 'An unexpected error occurred';
 };
-
-// Database table names
-export const TABLES = {
-  USERS: 'users',
-  EMAIL_VERIFICATIONS: 'email_verifications',
-  PASSWORD_RESETS: 'password_resets',
-  ROLES: 'roles',
-  USER_ROLES: 'user_roles',
-} as const;

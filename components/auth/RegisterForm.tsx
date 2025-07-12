@@ -9,10 +9,9 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface RegisterFormProps {
   onNavigateToLogin: () => void;
-  onNavigateToVerification: (email: string) => void;
 }
 
-export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: RegisterFormProps) {
+export function RegisterForm({ onNavigateToLogin }: RegisterFormProps) {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,9 +20,10 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
     confirmPassword: '',
   });
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   
-  const { register, isLoading, error } = useAuth();
+  const { signUp, loading } = useAuth();
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -44,10 +44,8 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
     
     if (!formData.password.trim()) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      errors.password = 'Password must contain uppercase, lowercase, and number';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
     }
     
     if (!formData.confirmPassword.trim()) {
@@ -63,19 +61,34 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
   const handleRegister = async () => {
     if (!validateForm()) return;
     
-    const result = await register({
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      email: formData.email.trim(),
-      password: formData.password,
-      confirmPassword: formData.confirmPassword,
-    });
+    setError(null);
+    setSuccessMessage('');
+    
+    const { data, error: signUpError } = await signUp(
+      formData.email.trim(),
+      formData.password,
+      {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+      }
+    );
 
-    if (result.success) {
-      setSuccessMessage(result.message || '');
-      setTimeout(() => {
-        onNavigateToVerification(formData.email);
-      }, 2000);
+    if (signUpError) {
+      if (signUpError.message.includes('User already registered')) {
+        setError('An account with this email already exists. Please sign in instead.');
+      } else {
+        setError(signUpError.message);
+      }
+    } else {
+      setSuccessMessage('Registration successful! Please check your email for a confirmation link.');
+      // Clear form
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      });
     }
   };
 
@@ -83,6 +96,9 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
     setFormData(prev => ({ ...prev, [field]: value }));
     if (fieldErrors[field]) {
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (error) {
+      setError(null);
     }
   };
 
@@ -157,7 +173,7 @@ export function RegisterForm({ onNavigateToLogin, onNavigateToVerification }: Re
       <AuthButton
         title="Create Account"
         onPress={handleRegister}
-        loading={isLoading}
+        loading={loading}
         style={{ marginBottom: 24 }}
       />
 

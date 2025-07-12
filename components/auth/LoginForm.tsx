@@ -9,20 +9,19 @@ import { useAuth } from '@/hooks/useAuth';
 interface LoginFormProps {
   onNavigateToRegister: () => void;
   onNavigateToForgotPassword: () => void;
-  onNavigateToVerification: (email: string) => void;
 }
 
 export function LoginForm({ 
   onNavigateToRegister, 
   onNavigateToForgotPassword,
-  onNavigateToVerification 
 }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [error, setError] = useState<string | null>(null);
   
-  const { login, isLoading, error } = useAuth();
+  const { signIn, loading } = useAuth();
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -44,14 +43,18 @@ export function LoginForm({
   const handleLogin = async () => {
     if (!validateForm()) return;
     
-    const result = await login({ 
-      email: email.trim(), 
-      password,
-      rememberMe 
-    });
+    setError(null);
+    
+    const { error: signInError } = await signIn(email.trim(), password);
 
-    if (!result.success && result.data?.requiresVerification) {
-      onNavigateToVerification(email.trim());
+    if (signInError) {
+      if (signInError.message.includes('Email not confirmed')) {
+        setError('Please check your email and click the confirmation link before signing in.');
+      } else if (signInError.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError(signInError.message);
+      }
     }
   };
 
@@ -61,6 +64,10 @@ export function LoginForm({
     
     if (fieldErrors[field]) {
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    if (error) {
+      setError(null);
     }
   };
 
@@ -123,7 +130,7 @@ export function LoginForm({
       <AuthButton
         title="Sign In"
         onPress={handleLogin}
-        loading={isLoading}
+        loading={loading}
         style={{ marginBottom: 24 }}
       />
 

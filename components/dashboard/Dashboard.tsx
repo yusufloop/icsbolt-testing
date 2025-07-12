@@ -5,10 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 
 export function Dashboard() {
-  const { user, logout, isLoading } = useAuth();
+  const { user, signOut, loading } = useAuth();
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
   };
 
   const stats = [
@@ -22,6 +22,22 @@ export function Dashboard() {
     { label: 'App Settings', icon: 'settings', color: '#8b5cf6' },
     { label: 'Notifications', icon: 'notifications', color: '#06b6d4' },
   ];
+
+  // Get user display name from metadata or email
+  const getDisplayName = () => {
+    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
+      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
+    }
+    return user?.email?.split('@')[0] || 'User';
+  };
+
+  const getInitials = () => {
+    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
+      return `${user.user_metadata.first_name[0]}${user.user_metadata.last_name[0]}`;
+    }
+    const email = user?.email || '';
+    return email.substring(0, 2).toUpperCase();
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -39,14 +55,14 @@ export function Dashboard() {
               Welcome back,
             </Text>
             <Text className="text-gray-900 text-xl font-inter-bold mt-1">
-              {user?.first_name} {user?.last_name}
+              {getDisplayName()}
             </Text>
           </View>
           
           <TouchableOpacity 
             className="p-2 rounded-lg bg-gray-100 active:bg-gray-200"
             onPress={handleLogout}
-            disabled={isLoading}
+            disabled={loading}
           >
             <Ionicons name="log-out" size={20} color="#6b7280" />
           </TouchableOpacity>
@@ -58,14 +74,14 @@ export function Dashboard() {
             {/* Avatar */}
             <View className="w-16 h-16 bg-blue-500 rounded-full items-center justify-center">
               <Text className="text-white text-xl font-inter-bold">
-                {user?.first_name?.[0]}{user?.last_name?.[0]}
+                {getInitials()}
               </Text>
             </View>
             
             {/* User Details */}
             <View className="flex-1 ml-4">
               <Text className="text-gray-900 text-lg font-inter-semibold">
-                {user?.first_name} {user?.last_name}
+                {getDisplayName()}
               </Text>
               <Text className="text-gray-500 text-sm font-inter-regular mt-1">
                 {user?.email}
@@ -73,7 +89,7 @@ export function Dashboard() {
               <View className="flex-row items-center mt-2">
                 <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
                 <Text className="text-green-600 text-xs font-inter-regular">
-                  {user?.email_verified ? 'Verified' : 'Unverified'}
+                  {user?.email_confirmed_at ? 'Verified' : 'Unverified'}
                 </Text>
               </View>
             </View>

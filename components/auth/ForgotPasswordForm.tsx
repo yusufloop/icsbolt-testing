@@ -10,18 +10,15 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface ForgotPasswordFormProps {
   onNavigateToLogin: () => void;
-  onNavigateToPasswordReset: (resetToken: string) => void;
 }
 
-export function ForgotPasswordForm({ 
-  onNavigateToLogin, 
-  onNavigateToPasswordReset 
-}: ForgotPasswordFormProps) {
+export function ForgotPasswordForm({ onNavigateToLogin }: ForgotPasswordFormProps) {
   const [email, setEmail] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   
-  const { forgotPassword, isLoading, error } = useAuth();
+  const { resetPassword, loading } = useAuth();
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -39,19 +36,25 @@ export function ForgotPasswordForm({
   const handleForgotPassword = async () => {
     if (!validateForm()) return;
     
-    const result = await forgotPassword({ email: email.trim() });
+    setError(null);
+    setSuccessMessage('');
     
-    if (result.success) {
-      setSuccessMessage(result.message || '');
-      // In development, show the reset token in console
-      if (result.data?.resetToken) {
-        console.log('🔗 Reset token:', result.data.resetToken);
-        console.log('🔑 Reset code:', result.data.resetCode);
-        // Auto-navigate to reset form in development
-        setTimeout(() => {
-          onNavigateToPasswordReset(result.data.resetToken);
-        }, 3000);
-      }
+    const { error: resetError } = await resetPassword(email.trim());
+    
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setSuccessMessage('Password reset instructions have been sent to your email.');
+    }
+  };
+
+  const updateField = (value: string) => {
+    setEmail(value);
+    if (fieldErrors.email) {
+      setFieldErrors(prev => ({ ...prev, email: '' }));
+    }
+    if (error) {
+      setError(null);
     }
   };
 
@@ -83,7 +86,7 @@ export function ForgotPasswordForm({
       <AuthInput
         label="Email"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={updateField}
         placeholder="Enter your email"
         keyboardType="email-address"
         autoCapitalize="none"
@@ -94,7 +97,7 @@ export function ForgotPasswordForm({
       <AuthButton
         title="Send Reset Link"
         onPress={handleForgotPassword}
-        loading={isLoading}
+        loading={loading}
         style={{ marginBottom: 24 }}
       />
 
