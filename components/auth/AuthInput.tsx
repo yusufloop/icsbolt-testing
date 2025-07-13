@@ -1,94 +1,78 @@
-
 import React, { useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, TextInputProps, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, TextInput, Text, TouchableOpacity, TextInputProps } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 interface AuthInputProps extends TextInputProps {
   label: string;
   error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
+  rightIcon?: keyof typeof MaterialIcons.glyphMap;
   onRightIconPress?: () => void;
-  isPassword?: boolean;
 }
 
-export function AuthInput({ 
-  label, 
-  error, 
-  leftIcon, 
-  rightIcon, 
+export function AuthInput({
+  label,
+  error,
+  rightIcon,
   onRightIconPress,
-  isPassword = false,
-  ...props 
+  secureTextEntry,
+  ...props
 }: AuthInputProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  const isPassword = secureTextEntry;
+  const actualSecureTextEntry = isPassword ? !showPassword : false;
 
   const handleRightIconPress = () => {
     if (isPassword) {
-      togglePasswordVisibility();
+      setShowPassword(!showPassword);
     } else if (onRightIconPress) {
       onRightIconPress();
     }
   };
 
-  const getRightIconName = (): keyof typeof Ionicons.glyphMap => {
+  const getRightIconName = (): keyof typeof MaterialIcons.glyphMap => {
     if (isPassword) {
-      return showPassword ? 'eye-off' : 'eye';
+      return showPassword ? 'visibility-off' : 'visibility';
     }
-    return rightIcon || 'chevron-forward';
+    return rightIcon || 'chevron-right';
   };
 
   return (
-    <View className="mb-5">
-      <Text className="text-sm font-semibold text-gray-700 mb-2 font-inter-semibold">
+    <View className="mb-4">
+      <Text className="text-sm font-semibold text-gray-700 mb-2">
         {label}
       </Text>
       
       <View className={`
-        flex-row items-center bg-white border rounded-xl px-4 py-3
+        flex-row items-center bg-gray-50 border rounded-xl px-4 py-3
         ${error ? 'border-red-500' : isFocused ? 'border-blue-500' : 'border-gray-200'}
-        ${isFocused ? 'shadow-sm' : ''}
       `}>
-        {leftIcon && (
-          <Ionicons 
-            name={leftIcon} 
-            size={20} 
-            color={error ? '#ef4444' : isFocused ? '#3b82f6' : '#9ca3af'} 
-            style={{ marginRight: 12 }}
-          />
-        )}
-        
         <TextInput
-          className="flex-1 text-base text-gray-900 font-inter-regular"
+          className="flex-1 text-base text-gray-900"
           placeholderTextColor="#9ca3af"
-          secureTextEntry={isPassword && !showPassword}
+          secureTextEntry={actualSecureTextEntry}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
         />
         
         {(rightIcon || isPassword) && (
-          <Pressable 
+          <TouchableOpacity 
             onPress={handleRightIconPress} 
-            style={{ marginLeft: 8, padding: 4 }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            className="ml-2 p-1"
           >
-            <Ionicons 
+            <MaterialIcons 
               name={getRightIconName()} 
               size={20} 
               color={error ? '#ef4444' : '#9ca3af'} 
             />
-          </Pressable>
+          </TouchableOpacity>
         )}
       </View>
       
       {error && (
-        <Text className="text-red-500 text-sm mt-1 font-inter-regular">
+        <Text className="text-red-500 text-sm mt-1">
           {error}
         </Text>
       )}
