@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { RequestCard } from '@/components/ui/RequestCard';
 import { PremiumCard } from '@/components/ui/PremiumCard';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { router } from 'expo-router';
 
 export default function RequestsScreen() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);

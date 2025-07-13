@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, TextInputProps } from 'react-native';
+import { View, TextInput, Text, TouchableOpacity, TextInputProps, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface AuthInputProps extends TextInputProps {
@@ -72,13 +73,17 @@ export function AuthInput({
         />
         
         {(rightIcon || isPassword) && (
-          <TouchableOpacity onPress={handleRightIconPress} className="ml-2">
+          <Pressable 
+            onPress={handleRightIconPress} 
+            style={{ marginLeft: 8, padding: 4 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons 
               name={getRightIconName()} 
               size={20} 
               color={error ? '#ef4444' : '#9ca3af'} 
             />
-          </TouchableOpacity>
+          </Pressable>
         )}
       </View>
       

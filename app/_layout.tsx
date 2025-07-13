@@ -5,7 +5,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Slot } from 'expo-router'; // Change from Stack to Slot
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
@@ -38,11 +38,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-     
-      </Stack>
+      <Slot /> {/* Use Slot instead of Stack */}
       <StatusBar style="auto" />
     </AuthProvider>
   );

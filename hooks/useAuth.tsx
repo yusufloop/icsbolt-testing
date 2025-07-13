@@ -1,4 +1,4 @@
-// hooks/useAuth.ts - Fixed version
+// hooks/useAuth.tsx - Complete fixed version
 import { emailService } from "@/lib/emailService";
 import { supabase } from "@/lib/supabase";
 import type {
@@ -10,7 +10,7 @@ import type {
   PasswordResetData,
   RegisterCredentials,
 } from "@/types/auth";
-import bcrypt from "bcryptjs";
+import * as Crypto from 'expo-crypto';
 import {
   createContext,
   useCallback,
@@ -43,6 +43,38 @@ const generateToken = (): string => {
     Math.random().toString(36).substring(2, 15) +
     Math.random().toString(36).substring(2, 15)
   );
+};
+
+// Helper function to hash password using expo-crypto
+const hashPassword = async (password: string): Promise<string> => {
+  // Generate a salt using random bytes
+  const salt = await Crypto.getRandomBytesAsync(16);
+  const saltHex = Array.from(salt, byte => byte.toString(16).padStart(2, '0')).join('');
+  
+  // Create password + salt combination
+  const passwordWithSalt = password + saltHex;
+  
+  // Hash using SHA-256
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    passwordWithSalt
+  );
+  
+  // Return salt + hash combined
+  return saltHex + ':' + hash;
+};
+
+// Helper function to verify password
+const verifyPassword = async (password: string, storedHash: string): Promise<boolean> => {
+  const [salt, hash] = storedHash.split(':');
+  const passwordWithSalt = password + salt;
+  
+  const computedHash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    passwordWithSalt
+  );
+  
+  return computedHash === hash;
 };
 
 const handleSupabaseError = (error: any): string => {
@@ -83,11 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const {
           data: { session },
-          error,
+          error: sessionError,
         } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Session error:", error);
+        if (sessionError) {
+          console.error("Session error:", sessionError);
           setAuthState((prev) => ({ ...prev, isLoading: false }));
           return;
         }
@@ -124,181 +156,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
+    } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const { data: userData } = await supabase
+            .from(TABLES.USERS)
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
 
-      if (event === "SIGNED_IN" && session?.user) {
-        // Fetch user data
-        const { data: userData, error: userError } = await supabase
-          .from(TABLES.USERS)
-          .select("*")
-          .eq("user_id", session.user.id)
-          .single();
-
-        if (userData && !userError) {
+          if (userData) {
+            setAuthState({
+              user: userData,
+              isLoading: false,
+              isAuthenticated: true,
+              session,
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
           setAuthState({
-            user: userData,
+            user: null,
             isLoading: false,
-            isAuthenticated: true,
-            session,
+            isAuthenticated: false,
+            session: null,
           });
         }
-      } else if (event === "SIGNED_OUT") {
-        setAuthState({
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-          session: null,
-        });
       }
-    });
+    );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = useCallback(
-    async (credentials: LoginCredentials): Promise<AuthResponse> => {
-      setError(null);
-      setAuthState((prev) => ({ ...prev, isLoading: true }));
-
-      try {
-        // Find user by email
-        const { data: user, error: userError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("email", credentials.email.toLowerCase())
-          .single();
-
-        if (userError || !user) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Invalid email or password");
-          return { success: false, error: "Invalid email or password" };
-        }
-
-        // Check if user is locked
-        if (user.locked_until && new Date(user.locked_until) > new Date()) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Account is temporarily locked. Please try again later.");
-          return {
-            success: false,
-            error: "Account is temporarily locked. Please try again later.",
-          };
-        }
-
-        // Verify password
-        const isValidPassword = await bcrypt.compare(
-          credentials.password,
-          user.password_hash
-        );
-
-        if (!isValidPassword) {
-          // Increment failed attempts
-          const failedAttempts = user.failed_login_attempts + 1;
-          const lockUntil =
-            failedAttempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null; // 30 min lock
-
-          await supabase
-            .from(TABLES.USERS)
-            .update({
-              failed_login_attempts: failedAttempts,
-              locked_until: lockUntil?.toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.user_id);
-
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Invalid email or password");
-          return { success: false, error: "Invalid email or password" };
-        }
-
-        // Check if email is verified
-        if (!user.email_verified) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Please verify your email before logging in");
-          return {
-            success: false,
-            error: "Please verify your email before logging in",
-            data: { requiresVerification: true },
-          };
-        }
-
-        // Reset failed attempts and update last login
-        await supabase
-          .from(TABLES.USERS)
-          .update({
-            failed_login_attempts: 0,
-            locked_until: null,
-            last_login_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.user_id);
-
-        console.log("✅ User logged in:", user.email);
-
-        setAuthState({
-          user,
-          isLoading: false,
-          isAuthenticated: true,
-          session: null,
-        });
-
-        return { success: true, message: "Login successful!" };
-      } catch (err) {
-        const errorMessage = handleSupabaseError(err);
-        setError(errorMessage);
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
-        return { success: false, error: errorMessage };
-      }
-    },
-    []
-  );
-
+  // Register function
   const register = useCallback(
     async (credentials: RegisterCredentials): Promise<AuthResponse> => {
-      setError(null);
+      if (credentials.password !== credentials.confirmPassword) {
+        return { success: false, error: "Passwords do not match" };
+      }
+
       setAuthState((prev) => ({ ...prev, isLoading: true }));
+      setError(null);
 
       try {
-        // Validate passwords match
-        if (credentials.password !== credentials.confirmPassword) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Passwords do not match");
-          return { success: false, error: "Passwords do not match" };
-        }
-
         // Check if user already exists
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUser } = await supabase
           .from(TABLES.USERS)
-          .select("user_id, email_verified")
+          .select("email, email_verified")
           .eq("email", credentials.email.toLowerCase())
           .single();
 
-        if (existingUser && !checkError) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
+        if (existingUser) {
           if (existingUser.email_verified) {
-            setError("An account with this email already exists");
+            setAuthState((prev) => ({ ...prev, isLoading: false }));
             return {
               success: false,
-              error: "An account with this email already exists",
+              error: "An account with this email already exists.",
             };
           } else {
-            setError(
-              "An account with this email exists but is not verified. Please check your email."
-            );
+            setAuthState((prev) => ({ ...prev, isLoading: false }));
             return {
               success: false,
-              error:
-                "An account with this email exists but is not verified. Please check your email.",
+              error: "An account with this email exists but is not verified. Please check your email.",
             };
           }
         }
 
-        // Hash password
-        const saltRounds = 12;
-        const passwordHash = await bcrypt.hash(
-          credentials.password,
-          saltRounds
-        );
+        // Hash password using expo-crypto
+        const passwordHash = await hashPassword(credentials.password);
 
         // Create user in our users table
         const { data: newUser, error: userError } = await supabase
@@ -346,30 +272,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Verification record error:", verificationError);
         }
 
-        // SEND THE EMAIL HERE
+        // Send verification email
         await emailService.sendVerificationEmail(
           credentials.email,
           verificationCode,
           `${credentials.first_name} ${credentials.last_name}`
         );
 
-        console.log(
-          "📧 Verification email would be sent to:",
-          credentials.email
-        );
+        console.log("📧 Verification email would be sent to:", credentials.email);
         console.log("🔑 Verification code:", verificationCode);
 
         setAuthState((prev) => ({ ...prev, isLoading: false }));
 
         return {
           success: true,
-          message:
-            "Registration successful! Please check your email for verification code.",
-          data: {
-            email: credentials.email,
-            verificationCode, // In production, this would be sent via email
-            userId: newUser.user_id,
-          },
+          message: "Registration successful! Please check your email for verification code.",
+          data: { requiresVerification: true, email: credentials.email },
         };
       } catch (err) {
         const errorMessage = handleSupabaseError(err);
@@ -381,54 +299,149 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const verifyEmail = useCallback(
-    async (data: EmailVerificationData): Promise<AuthResponse> => {
-      setError(null);
+  // Login function
+  const login = useCallback(
+    async (credentials: LoginCredentials): Promise<AuthResponse> => {
       setAuthState((prev) => ({ ...prev, isLoading: true }));
+      setError(null);
 
       try {
-        // Find verification record
+        // Get user from your custom table
+        const { data: userData, error: userError } = await supabase
+          .from(TABLES.USERS)
+          .select('*')
+          .eq('email', credentials.email.toLowerCase())
+          .single();
+
+        if (userError || !userData) {
+          setAuthState((prev) => ({ ...prev, isLoading: false }));
+          return { success: false, error: "Invalid email or password" };
+        }
+
+        // Check if account is locked
+        if (userData.locked_until && new Date(userData.locked_until) > new Date()) {
+          setAuthState((prev) => ({ ...prev, isLoading: false }));
+          return { 
+            success: false, 
+            error: "Account is temporarily locked. Please try again later." 
+          };
+        }
+
+        // Verify password using expo-crypto
+        const isPasswordValid = await verifyPassword(credentials.password, userData.password_hash);
+
+        if (!isPasswordValid) {
+          // Increment failed attempts
+          const newFailedAttempts = userData.failed_login_attempts + 1;
+          const shouldLock = newFailedAttempts >= 5;
+          
+          await supabase
+            .from(TABLES.USERS)
+            .update({
+              failed_login_attempts: newFailedAttempts,
+              locked_until: shouldLock ? 
+                new Date(Date.now() + 30 * 60 * 1000).toISOString() : // Lock for 30 minutes
+                null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', userData.user_id);
+
+          setAuthState((prev) => ({ ...prev, isLoading: false }));
+          return { 
+            success: false, 
+            error: shouldLock ? 
+              "Too many failed attempts. Account locked for 30 minutes." :
+              "Invalid email or password" 
+          };
+        }
+
+        // Check if email is verified
+        if (!userData.email_verified) {
+          setAuthState((prev) => ({ ...prev, isLoading: false }));
+          return {
+            success: false,
+            error: "Please verify your email before logging in.",
+            data: { requiresVerification: true, email: userData.email },
+          };
+        }
+
+        // Check if account is active
+        if (!userData.is_active) {
+          setAuthState((prev) => ({ ...prev, isLoading: false }));
+          return { success: false, error: "Account is deactivated" };
+        }
+
+        // Reset failed attempts and update last login
+        await supabase
+          .from(TABLES.USERS)
+          .update({
+            last_login_at: new Date().toISOString(),
+            failed_login_attempts: 0,
+            locked_until: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userData.user_id);
+
+        // Create a custom session
+        const sessionToken = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          userData.user_id + Date.now().toString()
+        );
+
+        setAuthState({
+          user: userData,
+          isLoading: false,
+          isAuthenticated: true,
+          session: { token: sessionToken, user: userData },
+        });
+
+        return { success: true, message: "Login successful!" };
+      } catch (err) {
+        const errorMessage = handleSupabaseError(err);
+        setError(errorMessage);
+        setAuthState((prev) => ({ ...prev, isLoading: false }));
+        return { success: false, error: errorMessage };
+      }
+    },
+    []
+  );
+
+  // Verify email function
+  const verifyEmail = useCallback(
+    async (data: EmailVerificationData): Promise<AuthResponse> => {
+      setAuthState((prev) => ({ ...prev, isLoading: true }));
+      setError(null);
+
+      try {
+        // Verify the code
         const { data: verification, error: verificationError } = await supabase
           .from(TABLES.EMAIL_VERIFICATIONS)
-          .select("*")
-          .eq("email", data.email.toLowerCase())
-          .eq("verification_code", data.verification_code.toUpperCase())
-          .is("verified_at", null)
+          .select('*')
+          .eq('email', data.email.toLowerCase())
+          .eq('verification_code', data.verification_code.toUpperCase())
+          .is('verified_at', null)
+          .gte('expires_at', new Date().toISOString())
           .single();
 
         if (verificationError || !verification) {
           setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Invalid verification code");
-          return { success: false, error: "Invalid verification code" };
+          return { success: false, error: "Invalid or expired verification code" };
         }
 
-        // Check if code has expired
-        const now = new Date();
-        const expiresAt = new Date(verification.expires_at);
-        if (now > expiresAt) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Verification code has expired");
-          return { success: false, error: "Verification code has expired" };
-        }
-
-        // Mark verification as completed
+        // Mark verification as used
         await supabase
           .from(TABLES.EMAIL_VERIFICATIONS)
-          .update({
-            verified_at: new Date().toISOString(),
-          })
-          .eq("id", verification.id);
+          .update({ verified_at: new Date().toISOString() })
+          .eq('id', verification.id);
 
         // Update user as verified
         await supabase
           .from(TABLES.USERS)
-          .update({
+          .update({ 
             email_verified: true,
-            updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
-          .eq("user_id", verification.user_id);
-
-        console.log("✅ Email verified for:", data.email);
+          .eq('user_id', verification.user_id);
 
         setAuthState((prev) => ({ ...prev, isLoading: false }));
         return { success: true, message: "Email verified successfully!" };
@@ -445,66 +458,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendVerificationCode = useCallback(
     async (email: string): Promise<AuthResponse> => {
       setError(null);
-      setAuthState((prev) => ({ ...prev, isLoading: true }));
 
       try {
-        // Find user
-        const { data: user, error: userError } = await supabase
-          .from(TABLES.USERS)
-          .select("*")
-          .eq("email", email.toLowerCase())
-          .single();
-
-        if (userError || !user) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("User not found");
-          return { success: false, error: "User not found" };
-        }
-
-        if (user.email_verified) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Email is already verified");
-          return { success: false, error: "Email is already verified" };
-        }
-
-        // Generate new verification code
         const verificationCode = generateVerificationCode();
         const verificationToken = generateToken();
         const expiresAt = new Date(
           Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000
         );
 
-        // Create new verification record
-        await supabase.from(TABLES.EMAIL_VERIFICATIONS).insert({
-          user_id: user.user_id,
-          email: email.toLowerCase(),
-          verification_code: verificationCode,
-          verification_token: verificationToken,
-          expires_at: expiresAt.toISOString(),
-          attempts: 0,
-          created_at: new Date().toISOString(),
-        });
+        // Get user data
+        const { data: userData } = await supabase
+          .from(TABLES.USERS)
+          .select('user_id, first_name, last_name')
+          .eq('email', email.toLowerCase())
+          .single();
 
-        // SEND THE EMAIL HERE
+        if (!userData) {
+          return { success: false, error: "User not found" };
+        }
+
+        // Create new verification record
+        const { error: verificationError } = await supabase
+          .from(TABLES.EMAIL_VERIFICATIONS)
+          .insert({
+            user_id: userData.user_id,
+            email: email.toLowerCase(),
+            verification_code: verificationCode,
+            verification_token: verificationToken,
+            expires_at: expiresAt.toISOString(),
+            attempts: 0,
+            created_at: new Date().toISOString(),
+          });
+
+        if (verificationError) {
+          return { success: false, error: handleSupabaseError(verificationError) };
+        }
+
+        // Send new verification email
         await emailService.sendVerificationEmail(
           email,
           verificationCode,
-          `${user.first_name} ${user.last_name}`
+          `${userData.first_name} ${userData.last_name}`
         );
 
-        console.log("📧 New verification code sent to:", email);
-        console.log("🔑 New verification code:", verificationCode);
-
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
-        return {
-          success: true,
-          message: "New verification code sent!",
-          data: { verificationCode }, // In production, this would be sent via email
-        };
+        return { success: true, message: "Verification code sent!" };
       } catch (err) {
         const errorMessage = handleSupabaseError(err);
         setError(errorMessage);
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
         return { success: false, error: errorMessage };
       }
     },
@@ -514,57 +514,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const forgotPassword = useCallback(
     async (data: ForgotPasswordData): Promise<AuthResponse> => {
       setError(null);
-      setAuthState((prev) => ({ ...prev, isLoading: true }));
 
       try {
-        // Find user
-        const { data: user, error: userError } = await supabase
-          .from(TABLES.USERS)
-          .select("*")
-          .eq("email", data.email.toLowerCase())
-          .single();
-
-        if (userError || !user) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          // For security, don't reveal if email exists
-          return {
-            success: true,
-            message:
-              "If an account with this email exists, a password reset link has been sent.",
-          };
-        }
-
-        // Generate reset token
-        const resetToken = generateToken();
-        const resetCode = generateVerificationCode();
-        const expiresAt = new Date(
-          Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000
-        );
-
-        // Create password reset record
-        await supabase.from(TABLES.PASSWORD_RESETS).insert({
-          user_id: user.user_id,
-          email: data.email.toLowerCase(),
-          reset_token: resetToken,
-          reset_code: resetCode,
-          expires_at: expiresAt.toISOString(),
-          attempts: 0,
-          created_at: new Date().toISOString(),
+        const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+          redirectTo: 'your-app://reset-password', // Configure this URL
         });
 
-        console.log("📧 Password reset email would be sent to:", data.email);
-        console.log("🔑 Reset token:", resetToken);
+        if (error) {
+          return { success: false, error: handleSupabaseError(error) };
+        }
 
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
-        return {
-          success: true,
-          message: "Password reset instructions have been sent to your email.",
-          data: { resetToken }, // In production, this would be sent via email
+        return { 
+          success: true, 
+          message: "Password reset instructions sent to your email!" 
         };
       } catch (err) {
         const errorMessage = handleSupabaseError(err);
         setError(errorMessage);
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
         return { success: false, error: errorMessage };
       }
     },
@@ -574,73 +540,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resetPassword = useCallback(
     async (data: PasswordResetData): Promise<AuthResponse> => {
       setError(null);
-      setAuthState((prev) => ({ ...prev, isLoading: true }));
 
       try {
-        // Validate passwords match
-        if (data.new_password !== data.confirm_password) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Passwords do not match");
-          return { success: false, error: "Passwords do not match" };
+        const { error } = await supabase.auth.updateUser({
+          password: data.new_password
+        });
+
+        if (error) {
+          return { success: false, error: handleSupabaseError(error) };
         }
 
-        // Find reset record
-        const { data: resetRecord, error: resetError } = await supabase
-          .from(TABLES.PASSWORD_RESETS)
-          .select("*")
-          .eq("reset_token", data.reset_token)
-          .is("used_at", null)
-          .single();
-
-        if (resetError || !resetRecord) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Invalid or expired reset token");
-          return { success: false, error: "Invalid or expired reset token" };
-        }
-
-        // Check if token has expired
-        const now = new Date();
-        const expiresAt = new Date(resetRecord.expires_at);
-        if (now > expiresAt) {
-          setAuthState((prev) => ({ ...prev, isLoading: false }));
-          setError("Reset token has expired");
-          return { success: false, error: "Reset token has expired" };
-        }
-
-        // Hash new password
-        const saltRounds = 12;
-        const newPasswordHash = await bcrypt.hash(
-          data.new_password,
-          saltRounds
-        );
-
-        // Update user password
-        await supabase
-          .from(TABLES.USERS)
-          .update({
-            password_hash: newPasswordHash,
-            failed_login_attempts: 0,
-            locked_until: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", resetRecord.user_id);
-
-        // Mark reset token as used
-        await supabase
-          .from(TABLES.PASSWORD_RESETS)
-          .update({
-            used_at: new Date().toISOString(),
-          })
-          .eq("id", resetRecord.id);
-
-        console.log("✅ Password reset for:", resetRecord.email);
-
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
-        return { success: true, message: "Password reset successfully!" };
+        return { success: true, message: "Password updated successfully!" };
       } catch (err) {
         const errorMessage = handleSupabaseError(err);
         setError(errorMessage);
-        setAuthState((prev) => ({ ...prev, isLoading: false }));
         return { success: false, error: errorMessage };
       }
     },
@@ -675,7 +588,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
