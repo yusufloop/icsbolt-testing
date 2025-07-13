@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { useAuth } from '@/lib/auth';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { AuthButton } from './AuthButton';
 import { AuthCard } from './AuthCard';
 import { AuthInput } from './AuthInput';
-import { AuthButton } from './AuthButton';
 import { ErrorMessage } from './ErrorMessage';
 import { SuccessMessage } from './SuccessMessage';
-import { useAuth } from '@/hooks/useAuth';
 
 interface ForgotPasswordFormProps {
   onNavigateToLogin: () => void;

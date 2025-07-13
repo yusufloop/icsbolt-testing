@@ -1,9 +1,8 @@
-import React from 'react';
-import { View, SafeAreaView } from 'react-native';
-import { router } from 'expo-router';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { useAuth } from '@/hooks/useAuth';
-import { useEffect } from 'react';
+import { useAuth } from '@/lib/auth';
+import { router } from 'expo-router';
+import React, { useEffect } from 'react';
+import { SafeAreaView, View } from 'react-native';
 
 export default function AuthScreen() {
   const { isAuthenticated } = useAuth();

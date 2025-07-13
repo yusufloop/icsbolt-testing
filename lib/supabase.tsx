@@ -8,7 +8,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Configure headers for self-hosted Supabase
+// Clean the URL - remove trailing slash if present
+const cleanUrl = supabaseUrl.replace(/\/$/, '');
+
+// Configure headers for self-hosted/ngrok Supabase
 const headers: Record<string, string> = {
   'Content-Type': 'application/json',
 };
@@ -28,6 +31,8 @@ const options = {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: Platform.OS === 'web',
+    // Important: Ensure the flow type is correct
+    flowType: 'pkce' as const,
   },
   global: {
     headers,
@@ -42,7 +47,7 @@ const options = {
   },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, options);
+export const supabase = createClient(cleanUrl, supabaseAnonKey, options);
 
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error: any): string => {
@@ -55,11 +60,26 @@ export const handleSupabaseError = (error: any): string => {
   return 'An unexpected error occurred';
 };
 
-// Database table names
-export const TABLES = {
-  USERS: 'users',
-  EMAIL_VERIFICATIONS: 'email_verifications',
-  PASSWORD_RESETS: 'password_resets',
-  ROLES: 'roles',
-  USER_ROLES: 'user_roles',
-} as const;
+// Test function to verify connection
+export const testSupabaseConnection = async () => {
+  try {
+    console.log('Testing Supabase connection...');
+    console.log('URL:', cleanUrl);
+    
+    const { data, error } = await supabase
+      .from('roles')
+      .select('*')
+      .limit(1);
+    
+    if (error) {
+      console.error('Connection test failed:', error);
+      return false;
+    }
+    
+    console.log('✅ Supabase connection successful');
+    return true;
+  } catch (err) {
+    console.error('❌ Supabase connection failed:', err);
+    return false;
+  }
+};

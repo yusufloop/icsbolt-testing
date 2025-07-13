@@ -1,10 +1,10 @@
+import { useAuth } from '@/lib/auth';
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { AuthButton } from './AuthButton';
 import { AuthCard } from './AuthCard';
 import { AuthInput } from './AuthInput';
-import { AuthButton } from './AuthButton';
 import { ErrorMessage } from './ErrorMessage';
-import { useAuth } from '@/hooks/useAuth';
 
 interface LoginFormProps {
   onNavigateToRegister: () => void;
